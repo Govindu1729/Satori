@@ -1,7 +1,3 @@
---- zen-agentic-extension/docs/ARCHITECTURE.md (原始)
-
-
-+++ zen-agentic-extension/docs/ARCHITECTURE.md (修改后)
 # Architecture Documentation
 
 ## System Overview
