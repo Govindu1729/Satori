@@ -1,0 +1,25 @@
+{
+  "name": "zen-agentic-webextension",
+  "version": "0.1.0",
+  "description": "Agentic AI WebExtension for Zen Browser",
+  "scripts": {
+    "build": "echo 'Build completed - no bundling required for Phase 1'",
+    "watch": "echo 'Watch mode - files are plain JS'",
+    "lint": "eslint src/**/*.js background.js sidebar.js",
+    "package": "web-ext build --source-dir . --artifacts-dir ../dist"
+  },
+  "devDependencies": {
+    "eslint": "^8.0.0",
+    "web-ext": "^7.0.0"
+  },
+  "keywords": [
+    "zen-browser",
+    "firefox",
+    "webextension",
+    "ai",
+    "mcp",
+    "agentic"
+  ],
+  "author": "Zen Agentic Team",
+  "license": "MIT"
+}
