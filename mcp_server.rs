@@ -270,27 +270,86 @@ impl MCPServer {
 
     // Tool handler stubs - implementations delegate to respective subsystems
     async fn handle_take_snapshot(&self, _args: &serde_json::Value) -> Result<ToolCallResponse> {
-        todo!("Delegate to WebDriver BiDi subsystem")
+        // TODO: Delegate to WebDriver BiDi subsystem
+        Ok(ToolCallResponse {
+            request_id: Uuid::new_v4().to_string(),
+            result: Some(serde_json::json!({
+                "status": "not_implemented",
+                "message": "DOM snapshot via WebDriver not yet implemented"
+            })),
+            error: None,
+        })
     }
 
     async fn handle_click_by_uid(&self, _args: &serde_json::Value) -> Result<ToolCallResponse> {
-        todo!("Delegate to WebDriver BiDi subsystem with UID mapping")
+        // TODO: Delegate to WebDriver BiDi subsystem with UID mapping
+        Ok(ToolCallResponse {
+            request_id: Uuid::new_v4().to_string(),
+            result: Some(serde_json::json!({
+                "status": "not_implemented",
+                "message": "Click by UID via WebDriver not yet implemented"
+            })),
+            error: None,
+        })
     }
 
     async fn handle_evaluate_script(&self, _args: &serde_json::Value) -> Result<ToolCallResponse> {
-        todo!("Delegate to WebDriver BiDi subsystem")
+        // TODO: Delegate to WebDriver BiDi subsystem
+        Ok(ToolCallResponse {
+            request_id: Uuid::new_v4().to_string(),
+            result: Some(serde_json::json!({
+                "status": "not_implemented",
+                "message": "Script evaluation via WebDriver not yet implemented"
+            })),
+            error: None,
+        })
     }
 
     async fn handle_list_network_requests(&self, _args: &serde_json::Value) -> Result<ToolCallResponse> {
-        todo!("Delegate to WebExtension network observer")
+        // TODO: Delegate to WebExtension network observer
+        Ok(ToolCallResponse {
+            request_id: Uuid::new_v4().to_string(),
+            result: Some(serde_json::json!({
+                "status": "not_implemented",
+                "message": "Network request listing not yet implemented"
+            })),
+            error: None,
+        })
     }
 
-    async fn handle_get_screen_capture(&self, _args: &serde_json::Value) -> Result<ToolCallResponse> {
-        todo!("Delegate to ScreenCaptureKit subsystem")
+    async fn handle_get_screen_capture(&self, args: &serde_json::Value) -> Result<ToolCallResponse> {
+        // TODO: Delegate to ScreenCaptureKit subsystem
+        // For now, return placeholder response
+        let format = args.get("format").and_then(|v| v.as_str()).unwrap_or("jpeg");
+        Ok(ToolCallResponse {
+            request_id: Uuid::new_v4().to_string(),
+            result: Some(serde_json::json!({
+                "status": "not_implemented",
+                "message": "Screen capture implementation in progress - Phase 2",
+                "format": format,
+            })),
+            error: None,
+        })
     }
 
-    async fn handle_extract_page_content(&self, _args: &serde_json::Value) -> Result<ToolCallResponse> {
-        todo!("Delegate to Python ML backend subprocess")
+    async fn handle_extract_page_content(&self, args: &serde_json::Value) -> Result<ToolCallResponse> {
+        // TODO: Delegate to Python ML backend subprocess
+        // For now, return placeholder response
+        let analysis_types = args
+            .get("analysis_types")
+            .and_then(|v| v.as_array())
+            .map(|arr| arr.iter().filter_map(|v| v.as_str()).collect::<Vec<_>>())
+            .unwrap_or_else(|| vec!["summary"]);
+
+        Ok(ToolCallResponse {
+            request_id: Uuid::new_v4().to_string(),
+            result: Some(serde_json::json!({
+                "status": "not_implemented",
+                "message": "ML backend integration in progress",
+                "requested_analysis": analysis_types,
+            })),
+            error: None,
+        })
     }
 }
 
