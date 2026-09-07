@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zen Agentic AI</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: var(--zen-background-color, #1a1a2e);
+            color: var(--zen-text-color, #eaeaea);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            padding: 16px;
+            background: var(--zen-sidebar-background, #16213e);
+            border-bottom: 1px solid var(--zen-border-color, #2a2a4a);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .header h1 {
+            font-size: 16px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .header .status {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #ff4757;
+        }
+
+        .header .status.connected {
+            background: #2ed573;
+        }
+
+        .connection-btn {
+            padding: 6px 12px;
+            border: none;
+            border-radius: 6px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .connection-btn.connect {
+            background: #3742fa;
+            color: white;
+        }
+
+        .connection-btn.disconnect {
+            background: #ff4757;
+            color: white;
+        }
+
+        .connection-btn:hover {
+            opacity: 0.9;
+        }
+
+        .main-content {
+            flex: 1;
+            padding: 16px;
+            overflow-y: auto;
+        }
+
+        .section {
+            margin-bottom: 20px;
+            padding: 12px;
+            background: var(--zen-card-background, #16213e);
+            border-radius: 8px;
+            border: 1px solid var(--zen-border-color, #2a2a4a);
+        }
+
+        .section-title {
+            font-size: 13px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            color: var(--zen-accent-color, #5f84fe);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .chat-container {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .chat-messages {
+            flex: 1;
+            min-height: 200px;
+            max-height: 400px;
+            overflow-y: auto;
+            padding: 12px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 8px;
+        }
+
+        .message {
+            padding: 10px 14px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+
+        .message.user {
+            background: #3742fa;
+            color: white;
+            margin-left: 20px;
+        }
+
+        .message.assistant {
+            background: #2a2a4a;
+            color: #eaeaea;
+            margin-right: 20px;
+        }
+
+        .message.system {
+            background: #1e3a5f;
+            color: #7ec8ff;
+            font-size: 12px;
+            text-align: center;
+        }
+
+        .message.error {
+            background: #5f1e1e;
+            color: #ff9999;
+        }
+
+        .input-container {
+            display: flex;
+            gap: 8px;
+        }
+
+        .chat-input {
+            flex: 1;
+            padding: 10px 14px;
+            border: 1px solid var(--zen-border-color, #2a2a4a);
+            border-radius: 8px;
+            background: rgba(0, 0, 0, 0.3);
+            color: var(--zen-text-color, #eaeaea);
+            font-size: 13px;
+            resize: none;
+        }
+
+        .chat-input:focus {
+            outline: none;
+            border-color: var(--zen-accent-color, #5f84fe);
+        }
+
+        .send-btn {
+            padding: 10px 20px;
+            background: #3742fa;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: background 0.2s;
+        }
+
+        .send-btn:hover {
+            background: #2c36d9;
+        }
+
+        .send-btn:disabled {
+            background: #4a4a6a;
+            cursor: not-allowed;
+        }
+
+        .tools-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+        }
+
+        .tool-btn {
+            padding: 10px;
+            background: rgba(55, 66, 250, 0.1);
+            border: 1px solid var(--zen-border-color, #2a2a4a);
+            border-radius: 6px;
+            color: var(--zen-text-color, #eaeaea);
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: left;
+        }
+
+        .tool-btn:hover:not(:disabled) {
+            background: rgba(55, 66, 250, 0.2);
+            border-color: var(--zen-accent-color, #5f84fe);
+        }
+
+        .tool-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .tool-btn .tool-icon {
+            font-size: 16px;
+            margin-bottom: 4px;
+        }
+
+        .permission-banner {
+            padding: 12px;
+            background: #1e3a5f;
+            border-radius: 8px;
+            margin-bottom: 16px;
+            display: none;
+        }
+
+        .permission-banner.visible {
+            display: block;
+        }
+
+        .permission-banner h3 {
+            font-size: 13px;
+            margin-bottom: 8px;
+            color: #7ec8ff;
+        }
+
+        .permission-banner p {
+            font-size: 12px;
+            color: #a0a0a0;
+            line-height: 1.5;
+        }
+
+        .permission-steps {
+            margin-top: 10px;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 6px;
+            font-size: 11px;
+        }
+
+        .permission-steps ol {
+            margin-left: 16px;
+        }
+
+        .permission-steps li {
+            margin-bottom: 6px;
+            color: #b0b0b0;
+        }
+
+        .stats-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 11px;
+            color: #888;
+            margin-top: 8px;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Scrollbar styling */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.2);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--zen-border-color, #2a2a4a);
+            border-radius: 3px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--zen-accent-color, #5f84fe);
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>
+            <span class="status" id="connectionStatus"></span>
+            Zen Agentic AI
+        </h1>
+        <button class="connection-btn connect" id="connectBtn">Connect</button>
+    </div>
+
+    <div class="main-content">
+        <!-- Permission Banner -->
+        <div class="permission-banner" id="permissionBanner">
+            <h3>📸 Screen Capture Permission Required</h3>
+            <p>The native host needs screen recording permission to provide visual context to the AI.</p>
+            <div class="permission-steps">
+                <strong>macOS:</strong>
+                <ol>
+                    <li>Open System Settings</li>
+                    <li>Go to Privacy & Security → Screen & System Audio Recording</li>
+                    <li>Enable "zen-agentic-native"</li>
+                    <li>Restart the extension</li>
+                </ol>
+            </div>
+        </div>
+
+        <!-- Chat Section -->
+        <div class="section">
+            <div class="section-title">💬 AI Assistant</div>
+            <div class="chat-container">
+                <div class="chat-messages" id="chatMessages">
+                    <div class="message system">
+                        Welcome to Zen Agentic AI! Connect to the native host to get started.
+                    </div>
+                </div>
+                <div class="input-container">
+                    <textarea
+                        class="chat-input"
+                        id="chatInput"
+                        placeholder="Ask me anything about this page..."
+                        rows="2"
+                    ></textarea>
+                    <button class="send-btn" id="sendBtn">Send</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tools Section -->
+        <div class="section">
+            <div class="section-title">🛠️ MCP Tools</div>
+            <div class="tools-grid">
+                <button class="tool-btn" id="btnSnapshot" disabled>
+                    <div class="tool-icon">📷</div>
+                    <div>Take Snapshot</div>
+                </button>
+                <button class="tool-btn" id="btnScreenCapture" disabled>
+                    <div class="tool-icon">🖥️</div>
+                    <div>Screen Capture</div>
+                </button>
+                <button class="tool-btn" id="btnAnalyze" disabled>
+                    <div class="tool-icon">🔍</div>
+                    <div>Analyze Page</div>
+                </button>
+                <button class="tool-btn" id="btnNetwork" disabled>
+                    <div class="tool-icon">🌐</div>
+                    <div>Network Info</div>
+                </button>
+            </div>
+            <div class="stats-row">
+                <span id="domStats">DOM: --</span>
+                <span id="networkStats">Network: --</span>
+            </div>
+        </div>
+    </div>
+
+    <script src="sidebar.js"></script>
+</body>
+</html>
