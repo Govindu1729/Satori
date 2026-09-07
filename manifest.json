@@ -1,0 +1,54 @@
+{
+  "manifest_version": 2,
+  "name": "Zen Agentic AI",
+  "version": "0.1.0",
+  "description": "Agentic AI integration for Zen Browser with MCP, screen capture, and local ML",
+  "author": "Zen Agentic Team",
+  "homepage_url": "https://github.com/zen-agentic-extension",
+
+  "sidebar_action": {
+    "default_title": "Zen Agentic AI",
+    "default_panel": "sidebar.html",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "32": "icons/icon-32.png",
+      "48": "icons/icon-48.png",
+      "96": "icons/icon-96.png"
+    },
+    "open_at_install": false
+  },
+
+  "permissions": [
+    "activeTab",
+    "tabs",
+    "storage",
+    "nativeMessaging",
+    "<all_urls>"
+  ],
+
+  "background": {
+    "scripts": ["background.js"],
+    "persistent": true
+  },
+
+  "native_applications": {
+    "zen_agentic_native": {
+      "path": "/path/to/zen-agentic-native",
+      "allowed_extensions": ["zen-agentic-ai@localhost"]
+    }
+  },
+
+  "icons": {
+    "16": "icons/icon-16.png",
+    "32": "icons/icon-32.png",
+    "48": "icons/icon-48.png",
+    "96": "icons/icon-96.png"
+  },
+
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "zen-agentic-ai@localhost",
+      "strict_min_version": "109.0"
+    }
+  }
+}
