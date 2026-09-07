@@ -9,6 +9,7 @@ mod ipc;
 mod mcp_server;
 mod screen_capture_kit;
 mod webdriver_bidi;
+mod ml_bridge;
 
 use anyhow::{Context, Result};
 use std::io::{self, Read, Write};
@@ -24,16 +25,27 @@ struct AppState {
     screen_capture: screen_capture_kit::ScreenCaptureManager,
     /// WebDriver client for DOM automation
     webdriver: webdriver_bidi::WebDriverSession,
+    /// ML Bridge for Python NLP backend
+    ml_bridge: ml_bridge::MlBridge,
     /// Whether screen capture permission has been granted
     screen_capture_allowed: bool,
 }
 
 impl AppState {
     fn new() -> Self {
+        let ml_config = ml_bridge::MlBridgeConfig::default();
+        let mut ml_bridge = ml_bridge::MlBridge::new(ml_config);
+
+        // Try to initialize ML bridge, but don't fail if it's not available
+        if let Err(e) = ml_bridge.initialize() {
+            warn!("ML Bridge initialization failed (will retry on first use): {}", e);
+        }
+
         Self {
             mcp_server: mcp_server::MCPServer::new(),
             screen_capture: screen_capture_kit::ScreenCaptureManager::new(),
             webdriver: webdriver_bidi::WebDriverSession::new(),
+            ml_bridge,
             screen_capture_allowed: false,
         }
     }
@@ -398,6 +410,230 @@ async fn handle_message(
                     "version": env!("CARGO_PKG_VERSION"),
                     "rust_version": rustc_version_runtime::version(),
                     "target": std::env::consts::OS,
+                }),
+            ))
+        }
+
+        // ML Bridge: Sentiment Analysis
+        "ml_sentiment_analysis" => {
+            let params = message.params.as_object()
+                .ok_or_else(|| anyhow::anyhow!("Invalid params"))?;
+
+            let text = params.get("text")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| anyhow::anyhow!("Missing text"))?;
+
+            let mut state_locked = state.lock().await;
+
+            match state_locked.ml_bridge.analyze_sentiment(text) {
+                Ok(result) => Ok(ipc::NativeMessage::response(
+                    message.id,
+                    result,
+                )),
+                Err(e) => Ok(ipc::NativeMessage::error_response(
+                    message.id,
+                    -32020,
+                    e.to_string(),
+                )),
+            }
+        }
+
+        // ML Bridge: Entity Extraction
+        "ml_entity_extraction" => {
+            let params = message.params.as_object()
+                .ok_or_else(|| anyhow::anyhow!("Invalid params"))?;
+
+            let text = params.get("text")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| anyhow::anyhow!("Missing text"))?;
+
+            let mut state_locked = state.lock().await;
+
+            match state_locked.ml_bridge.extract_entities(text) {
+                Ok(result) => Ok(ipc::NativeMessage::response(
+                    message.id,
+                    result,
+                )),
+                Err(e) => Ok(ipc::NativeMessage::error_response(
+                    message.id,
+                    -32021,
+                    e.to_string(),
+                )),
+            }
+        }
+
+        // ML Bridge: Summarization
+        "ml_summarize" => {
+            let params = message.params.as_object()
+                .ok_or_else(|| anyhow::anyhow!("Invalid params"))?;
+
+            let text = params.get("text")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| anyhow::anyhow!("Missing text"))?;
+
+            let max_length = params.get("max_length")
+                .and_then(|v| v.as_u64())
+                .map(|v| v as usize);
+
+            let mut state_locked = state.lock().await;
+
+            match state_locked.ml_bridge.summarize(text, max_length) {
+                Ok(result) => Ok(ipc::NativeMessage::response(
+                    message.id,
+                    result,
+                )),
+                Err(e) => Ok(ipc::NativeMessage::error_response(
+                    message.id,
+                    -32022,
+                    e.to_string(),
+                )),
+            }
+        }
+
+        // ML Bridge: Keyword Extraction
+        "ml_extract_keywords" => {
+            let params = message.params.as_object()
+                .ok_or_else(|| anyhow::anyhow!("Invalid params"))?;
+
+            let text = params.get("text")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| anyhow::anyhow!("Missing text"))?;
+
+            let top_k = params.get("top_k")
+                .and_then(|v| v.as_u64())
+                .map(|v| v as usize);
+
+            let mut state_locked = state.lock().await;
+
+            match state_locked.ml_bridge.extract_keywords(text, top_k) {
+                Ok(result) => Ok(ipc::NativeMessage::response(
+                    message.id,
+                    result,
+                )),
+                Err(e) => Ok(ipc::NativeMessage::error_response(
+                    message.id,
+                    -32023,
+                    e.to_string(),
+                )),
+            }
+        }
+
+        // ML Bridge: Generate Embedding
+        "ml_generate_embedding" => {
+            let params = message.params.as_object()
+                .ok_or_else(|| anyhow::anyhow!("Invalid params"))?;
+
+            let text = params.get("text")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| anyhow::anyhow!("Missing text"))?;
+
+            let mut state_locked = state.lock().await;
+
+            match state_locked.ml_bridge.generate_embedding(text) {
+                Ok(result) => Ok(ipc::NativeMessage::response(
+                    message.id,
+                    result,
+                )),
+                Err(e) => Ok(ipc::NativeMessage::error_response(
+                    message.id,
+                    -32024,
+                    e.to_string(),
+                )),
+            }
+        }
+
+        // ML Bridge: RAG Query
+        "ml_rag_query" => {
+            let params = message.params.as_object()
+                .ok_or_else(|| anyhow::anyhow!("Invalid params"))?;
+
+            let query = params.get("query")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| anyhow::anyhow!("Missing query"))?;
+
+            let top_k = params.get("top_k")
+                .and_then(|v| v.as_u64())
+                .map(|v| v as usize);
+
+            let context = params.get("context")
+                .and_then(|v| v.as_array())
+                .map(|arr| arr.iter().filter_map(|v| v.as_str()).map(String::from).collect());
+
+            let mut state_locked = state.lock().await;
+
+            match state_locked.ml_bridge.rag_query(query, top_k, context) {
+                Ok(result) => Ok(ipc::NativeMessage::response(
+                    message.id,
+                    result,
+                )),
+                Err(e) => Ok(ipc::NativeMessage::error_response(
+                    message.id,
+                    -32025,
+                    e.to_string(),
+                )),
+            }
+        }
+
+        // ML Bridge: RAG Store Documents
+        "ml_rag_store" => {
+            let params = message.params.as_object()
+                .ok_or_else(|| anyhow::anyhow!("Invalid params"))?;
+
+            let documents = params.get("documents")
+                .and_then(|v| v.as_array())
+                .ok_or_else(|| anyhow::anyhow!("Missing documents"))?;
+
+            let rag_docs: Result<Vec<ml_bridge::RagDocument>, _> = documents.iter().map(|doc| {
+                let id = doc.get("id").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                let content = doc.get("content").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                let metadata = doc.get("metadata")
+                    .and_then(|v| v.as_object())
+                    .map(|m| m.iter().map(|(k, v)| (k.clone(), v.as_str().unwrap_or("").to_string())).collect())
+                    .unwrap_or_default();
+                let timestamp = doc.get("timestamp").and_then(|v| v.as_u64()).unwrap_or(0);
+
+                Ok(ml_bridge::RagDocument {
+                    id,
+                    content,
+                    metadata,
+                    timestamp,
+                })
+            }).collect();
+
+            match rag_docs {
+                Ok(docs) => {
+                    let mut state_locked = state.lock().await;
+
+                    match state_locked.ml_bridge.rag_store(docs) {
+                        Ok(result) => Ok(ipc::NativeMessage::response(
+                            message.id,
+                            result,
+                        )),
+                        Err(e) => Ok(ipc::NativeMessage::error_response(
+                            message.id,
+                            -32026,
+                            e.to_string(),
+                        )),
+                    }
+                },
+                Err(e) => Ok(ipc::NativeMessage::error_response(
+                    message.id,
+                    -32027,
+                    e.to_string(),
+                )),
+            }
+        }
+
+        // ML Bridge: Health Check
+        "ml_health_check" => {
+            let mut state_locked = state.lock().await;
+            let is_healthy = state_locked.ml_bridge.is_running() && state_locked.ml_bridge.heartbeat();
+
+            Ok(ipc::NativeMessage::response(
+                message.id,
+                serde_json::json!({
+                    "healthy": is_healthy,
+                    "running": state_locked.ml_bridge.is_running(),
                 }),
             ))
         }
