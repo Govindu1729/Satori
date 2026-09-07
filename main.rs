@@ -249,7 +249,7 @@ async fn handle_message(
                 serde_json::json!({
                     "version": env!("CARGO_PKG_VERSION"),
                     "rust_version": rustc_version_runtime::version(),
-                    "target": env!("TARGET"),
+                    "target": std::env::consts::OS,
                 }),
             ))
         }
@@ -341,6 +341,6 @@ async fn main() -> Result<()> {
 // Add runtime version dependency info
 mod rustc_version_runtime {
     pub fn version() -> String {
-        format!("{}", rustc_version_runtime::version())
+        format!("{}", ::rustc_version_runtime::version())
     }
 }
