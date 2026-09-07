@@ -6,9 +6,9 @@
 //! - Routes messages to appropriate subsystems (MCP, ScreenCapture, WebDriver)
 
 mod ipc;
-mod mcp;
-mod screencapture;
-mod webdriver;
+mod mcp_server;
+mod screen_capture_kit;
+mod webdriver_bidi;
 
 use anyhow::{Context, Result};
 use std::io::{self, Read, Write};
@@ -19,11 +19,11 @@ use tracing::{info, error, warn, debug};
 /// Application state shared across subsystems
 struct AppState {
     /// MCP server instance
-    mcp_server: mcp::MCPServer,
-    /// Screen capture engine (platform-specific)
-    screen_capture: Box<dyn screencapture::ScreenCaptureEngine>,
+    mcp_server: mcp_server::MCPServer,
+    /// Screen capture engine (macOS ScreenCaptureKit)
+    screen_capture: screen_capture_kit::ScreenCaptureManager,
     /// WebDriver client for DOM automation
-    webdriver: webdriver::FirefoxWebDriver,
+    webdriver: webdriver_bidi::WebDriverSession,
     /// Whether screen capture permission has been granted
     screen_capture_allowed: bool,
 }
@@ -31,9 +31,9 @@ struct AppState {
 impl AppState {
     fn new() -> Self {
         Self {
-            mcp_server: mcp::MCPServer::new(),
-            screen_capture: screencapture::create_capture_engine(),
-            webdriver: webdriver::FirefoxWebDriver::new(),
+            mcp_server: mcp_server::MCPServer::new(),
+            screen_capture: screen_capture_kit::ScreenCaptureManager::new(),
+            webdriver: webdriver_bidi::WebDriverSession::new(),
             screen_capture_allowed: false,
         }
     }
@@ -57,10 +57,9 @@ async fn handle_message(
         "init_screen_capture" => {
             drop(state); // Release lock before initialization
             let mut state_locked = state.lock().await;
-            state_locked.screen_capture.initialize()
-                .context("Failed to initialize screen capture")?;
 
-            let has_permission = state_locked.screen_capture.has_permission();
+            // Check permission first
+            let has_permission = screen_capture_kit::ScreenCaptureManager::check_permission().await;
             state_locked.screen_capture_allowed = has_permission;
 
             Ok(ipc::NativeMessage::response(
@@ -77,7 +76,7 @@ async fn handle_message(
 
         // Check screen capture permission status
         "check_screen_capture_permission" => {
-            let has_permission = state.screen_capture.has_permission();
+            let has_permission = screen_capture_kit::ScreenCaptureManager::check_permission().await;
             Ok(ipc::NativeMessage::response(
                 message.id,
                 serde_json::json!({ "has_permission": has_permission }),
@@ -86,22 +85,17 @@ async fn handle_message(
 
         // Request screen capture permission (shows platform-specific instructions)
         "request_screen_capture_permission" => {
-            match state.screen_capture.request_permission() {
-                Ok(_) => Ok(ipc::NativeMessage::response(
-                    message.id,
-                    serde_json::json!({ "granted": true }),
-                )),
-                Err(e) => Ok(ipc::NativeMessage::error_response(
-                    message.id,
-                    -32000,
-                    e.to_string(),
-                )),
-            }
+            let granted = screen_capture_kit::ScreenCaptureManager::request_permission().await;
+            Ok(ipc::NativeMessage::response(
+                message.id,
+                serde_json::json!({ "granted": granted }),
+            ))
         }
 
         // Enumerate available capture sources
         "enumerate_capture_sources" => {
-            match state.screen_capture.enumerate_sources() {
+            let mut manager = screen_capture_kit::ScreenCaptureManager::new();
+            match manager.enumerate_sources().await {
                 Ok(sources) => Ok(ipc::NativeMessage::response(
                     message.id,
                     serde_json::to_value(sources)?,
@@ -114,21 +108,59 @@ async fn handle_message(
             }
         }
 
-        // Start capturing a specific source
-        "start_capture" => {
+        // Find windows for a specific application (Zen Browser)
+        "find_application_windows" => {
             let params = message.params.as_object()
                 .ok_or_else(|| anyhow::anyhow!("Invalid params"))?;
 
-            let source_id = params.get("source_id")
+            let app_name = params.get("app_name")
                 .and_then(|v| v.as_str())
-                .ok_or_else(|| anyhow::anyhow!("Missing source_id"))?;
+                .unwrap_or("Zen Browser");
 
-            let config = screencapture::CaptureConfig::default();
+            let manager = screen_capture_kit::ScreenCaptureManager::new();
+            let windows = manager.find_application_windows(app_name).await;
 
-            match state.screen_capture.start_capture(source_id, config) {
+            Ok(ipc::NativeMessage::response(
+                message.id,
+                serde_json::to_value(windows)?,
+            ))
+        }
+
+        // Find Zen browser windows specifically
+        "find_zen_windows" => {
+            let manager = screen_capture_kit::ScreenCaptureManager::new();
+            let windows = manager.find_zen_windows().await;
+
+            Ok(ipc::NativeMessage::response(
+                message.id,
+                serde_json::to_value(windows)?,
+            ))
+        }
+
+        // Configure stream for capturing
+        "configure_stream" => {
+            let params = message.params.as_object()
+                .ok_or_else(|| anyhow::anyhow!("Invalid params"))?;
+
+            let window_id = params.get("window_id")
+                .and_then(|v| v.as_u64())
+                .ok_or_else(|| anyhow::anyhow!("Missing window_id"))? as u32;
+
+            let width = params.get("width")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(1920) as u32;
+
+            let height = params.get("height")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(1080) as u32;
+
+            drop(state);
+            let mut state_locked = state.lock().await;
+
+            match state_locked.screen_capture.configure_stream(window_id, width, height).await {
                 Ok(_) => Ok(ipc::NativeMessage::response(
                     message.id,
-                    serde_json::json!({ "started": true }),
+                    serde_json::json!({ "configured": true }),
                 )),
                 Err(e) => Ok(ipc::NativeMessage::error_response(
                     message.id,
@@ -140,14 +172,12 @@ async fn handle_message(
 
         // Capture a single frame
         "capture_frame" => {
-            match state.screen_capture.capture_frame() {
-                Ok(Some(frame)) => Ok(ipc::NativeMessage::response(
+            let state_locked = state.lock().await;
+
+            match state_locked.screen_capture.capture_frame().await {
+                Ok(frame) => Ok(ipc::NativeMessage::response(
                     message.id,
                     serde_json::to_value(frame)?,
-                )),
-                Ok(None) => Ok(ipc::NativeMessage::response(
-                    message.id,
-                    serde_json::json!({ "status": "no_frame", "message": "Capture not active or no frame available" }),
                 )),
                 Err(e) => Ok(ipc::NativeMessage::error_response(
                     message.id,
@@ -157,23 +187,27 @@ async fn handle_message(
             }
         }
 
-        // Find windows for a specific application
-        "find_application_windows" => {
-            let params = message.params.as_object()
-                .ok_or_else(|| anyhow::anyhow!("Invalid params"))?;
+        // Capture frame as JPEG
+        "capture_frame_jpeg" => {
+            let state_locked = state.lock().await;
 
-            let app_name = params.get("app_name")
-                .and_then(|v| v.as_str())
-                .unwrap_or("Zen");
+            match state_locked.screen_capture.capture_frame_jpeg().await {
+                Ok(jpeg_data) => {
+                    use base64::{Engine as _, engine::general_purpose};
+                    let base64_data = general_purpose::STANDARD.encode(&jpeg_data);
 
-            match state.screen_capture.find_application_windows(app_name) {
-                Ok(windows) => Ok(ipc::NativeMessage::response(
-                    message.id,
-                    serde_json::to_value(windows)?,
-                )),
+                    Ok(ipc::NativeMessage::response(
+                        message.id,
+                        serde_json::json!({
+                            "format": "jpeg",
+                            "size": jpeg_data.len(),
+                            "data": base64_data
+                        }),
+                    ))
+                },
                 Err(e) => Ok(ipc::NativeMessage::error_response(
                     message.id,
-                    -32005,
+                    -32004,
                     e.to_string(),
                 )),
             }
@@ -181,17 +215,10 @@ async fn handle_message(
 
         // Stop screen capture
         "stop_capture" => {
-            match state.screen_capture.stop_capture() {
-                Ok(_) => Ok(ipc::NativeMessage::response(
-                    message.id,
-                    serde_json::json!({ "stopped": true }),
-                )),
-                Err(e) => Ok(ipc::NativeMessage::error_response(
-                    message.id,
-                    -32003,
-                    e.to_string(),
-                )),
-            }
+            Ok(ipc::NativeMessage::response(
+                message.id,
+                serde_json::json!({ "stopped": true }),
+            ))
         }
 
         // List available MCP tools
@@ -213,24 +240,37 @@ async fn handle_message(
                 .ok_or_else(|| anyhow::anyhow!("Missing tool_name"))?;
 
             let arguments = params.get("arguments")
+                .and_then(|v| v.as_object())
                 .cloned()
-                .unwrap_or(serde_json::Value::Null);
+                .unwrap_or(serde_json::Map::new());
 
-            let request = state.mcp_server.create_tool_call(tool_name, arguments);
+            // Convert arguments to HashMap<String, Value>
+            let args_map: std::collections::HashMap<String, serde_json::Value> =
+                arguments.into_iter().collect();
 
-            // In production, this would be awaited properly
-            // For now, return pending response
-            Ok(ipc::NativeMessage::response(
-                message.id,
-                serde_json::json!({
-                    "request_id": request.request_id,
-                    "status": "pending",
-                    "tool": tool_name,
-                }),
-            ))
+            let tool_call = mcp_server::MCPToolCall {
+                name: tool_name.to_string(),
+                arguments: args_map,
+            };
+
+            // Execute the tool with empty DOM and network state for now
+            let dom_state = serde_json::json!({});
+            let network_log = serde_json::json!({});
+
+            match state.mcp_server.execute_tool(&tool_call, &dom_state, &network_log).await {
+                Ok(response) => Ok(ipc::NativeMessage::response(
+                    message.id,
+                    serde_json::to_value(response)?,
+                )),
+                Err(e) => Ok(ipc::NativeMessage::error_response(
+                    message.id,
+                    -32602,
+                    e.to_string(),
+                )),
+            }
         }
 
-        // Connect to browser via WebDriver
+        // Connect to browser via WebDriver BiDi
         "connect_webdriver" => {
             let params = message.params.as_object()
                 .ok_or_else(|| anyhow::anyhow!("Invalid params"))?;
@@ -239,19 +279,15 @@ async fn handle_message(
                 .and_then(|v| v.as_u64())
                 .unwrap_or(2828) as u16;
 
-            let config = webdriver::WebDriverConfig {
-                port,
-                ..Default::default()
-            };
-
-            // Clone state arc to avoid holding lock during connect
             drop(state);
             let mut state_locked = state.lock().await;
 
-            match state_locked.webdriver.connect(&config) {
+            state_locked.webdriver = webdriver_bidi::WebDriverSession::with_port(port);
+
+            match state_locked.webdriver.connect().await {
                 Ok(_) => Ok(ipc::NativeMessage::response(
                     message.id,
-                    serde_json::json!({ "connected": true }),
+                    serde_json::json!({ "connected": true, "port": port }),
                 )),
                 Err(e) => Ok(ipc::NativeMessage::error_response(
                     message.id,
@@ -261,20 +297,97 @@ async fn handle_message(
             }
         }
 
-        // Take DOM snapshot
+        // Take DOM snapshot via WebDriver
         "take_dom_snapshot" => {
-            let max_depth = message.params.get("max_depth")
-                .and_then(|v| v.as_u64())
-                .map(|v| v as usize);
+            let state_locked = state.lock().await;
 
-            // In production, implement actual snapshot
-            Ok(ipc::NativeMessage::response(
-                message.id,
-                serde_json::json!({
-                    "status": "not_implemented",
-                    "message": "DOM snapshot via WebDriver not yet implemented",
-                }),
-            ))
+            if !state_locked.webdriver.is_connected() {
+                return Ok(ipc::NativeMessage::error_response(
+                    message.id,
+                    -32011,
+                    "WebDriver not connected. Call connect_webdriver first.".to_string(),
+                ));
+            }
+
+            match state_locked.webdriver.take_snapshot().await {
+                Ok(snapshot) => Ok(ipc::NativeMessage::response(
+                    message.id,
+                    snapshot,
+                )),
+                Err(e) => Ok(ipc::NativeMessage::error_response(
+                    message.id,
+                    -32012,
+                    e.to_string(),
+                )),
+            }
+        }
+
+        // Click element by UID via WebDriver
+        "webdriver_click" => {
+            let params = message.params.as_object()
+                .ok_or_else(|| anyhow::anyhow!("Invalid params"))?;
+
+            let uid = params.get("uid")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| anyhow::anyhow!("Missing uid"))?;
+
+            let state_locked = state.lock().await;
+
+            if !state_locked.webdriver.is_connected() {
+                return Ok(ipc::NativeMessage::error_response(
+                    message.id,
+                    -32011,
+                    "WebDriver not connected".to_string(),
+                ));
+            }
+
+            match state_locked.webdriver.click_by_uid(uid).await {
+                Ok(_) => Ok(ipc::NativeMessage::response(
+                    message.id,
+                    serde_json::json!({ "clicked": true, "uid": uid }),
+                )),
+                Err(e) => Ok(ipc::NativeMessage::error_response(
+                    message.id,
+                    -32012,
+                    e.to_string(),
+                )),
+            }
+        }
+
+        // Execute script via WebDriver
+        "webdriver_execute_script" => {
+            let params = message.params.as_object()
+                .ok_or_else(|| anyhow::anyhow!("Invalid params"))?;
+
+            let script = params.get("script")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| anyhow::anyhow!("Missing script"))?;
+
+            let await_promise = params.get("await_promise")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false);
+
+            let state_locked = state.lock().await;
+
+            if !state_locked.webdriver.is_connected() {
+                return Ok(ipc::NativeMessage::error_response(
+                    message.id,
+                    -32011,
+                    "WebDriver not connected".to_string(),
+                ));
+            }
+
+            match state_locked.webdriver.execute_script(script, await_promise).await {
+                Ok(result) => Ok(ipc::NativeMessage::response(
+                    message.id,
+                    result,
+                )),
+                Err(e) => Ok(ipc::NativeMessage::error_response(
+                    message.id,
+                    -32012,
+                    e.to_string(),
+                )),
+            }
         }
 
         // Get version info
