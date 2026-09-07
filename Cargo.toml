@@ -37,6 +37,9 @@ image = { version = "0.24", default-features = false, features = ["jpeg", "png"]
 # UUID for element identification
 uuid = { version = "1.0", features = ["v4"] }
 
+# Runtime version info
+rustc_version_runtime = "0.3"
+
 # MCP SDK (when available)
 # mcp-sdk = "0.1"
 
