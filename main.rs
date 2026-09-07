@@ -140,8 +140,43 @@ async fn handle_message(
 
         // Capture a single frame
         "capture_frame" => {
-            // Note: This is blocking - in production, use async stream
-            todo!("Implement async frame streaming")
+            match state.screen_capture.capture_frame() {
+                Ok(Some(frame)) => Ok(ipc::NativeMessage::response(
+                    message.id,
+                    serde_json::to_value(frame)?,
+                )),
+                Ok(None) => Ok(ipc::NativeMessage::response(
+                    message.id,
+                    serde_json::json!({ "status": "no_frame", "message": "Capture not active or no frame available" }),
+                )),
+                Err(e) => Ok(ipc::NativeMessage::error_response(
+                    message.id,
+                    -32004,
+                    e.to_string(),
+                )),
+            }
+        }
+
+        // Find windows for a specific application
+        "find_application_windows" => {
+            let params = message.params.as_object()
+                .ok_or_else(|| anyhow::anyhow!("Invalid params"))?;
+
+            let app_name = params.get("app_name")
+                .and_then(|v| v.as_str())
+                .unwrap_or("Zen");
+
+            match state.screen_capture.find_application_windows(app_name) {
+                Ok(windows) => Ok(ipc::NativeMessage::response(
+                    message.id,
+                    serde_json::to_value(windows)?,
+                )),
+                Err(e) => Ok(ipc::NativeMessage::error_response(
+                    message.id,
+                    -32005,
+                    e.to_string(),
+                )),
+            }
         }
 
         // Stop screen capture
