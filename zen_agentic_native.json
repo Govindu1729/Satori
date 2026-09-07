@@ -1,0 +1,7 @@
+{
+  "name": "zen_agentic_native",
+  "description": "Zen Agentic AI Native Host",
+  "path": "/absolute/path/to/zen-agentic-extension/native-host/target/release/zen-agentic-native",
+  "type": "stdio",
+  "allowed_extensions": ["zen-agentic-ai@localhost"]
+}
