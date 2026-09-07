@@ -1,0 +1,49 @@
+[package]
+name = "zen-agentic-native"
+version = "0.1.0"
+edition = "2021"
+authors = ["Zen Agentic Team"]
+description = "Native messaging host for Zen Browser Agentic Extension"
+license = "MIT"
+
+[dependencies]
+# JSON serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Async runtime
+tokio = { version = "1.0", features = ["full"] }
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Error handling
+thiserror = "1.0"
+anyhow = "1.0"
+
+# Native messaging helper (optional, we can implement manually)
+# webextension-native-messaging = "0.1"
+
+# Screen capture (macOS only - conditional compilation)
+[target.'cfg(target_os = "macos")'.dependencies]
+screencapturekit = "0.2"
+objc2 = "0.5"
+objc2-foundation = "0.2"
+
+# Image encoding
+image = { version = "0.24", default-features = false, features = ["jpeg", "png"] }
+
+# UUID for element identification
+uuid = { version = "1.0", features = ["v4"] }
+
+# MCP SDK (when available)
+# mcp-sdk = "0.1"
+
+[dev-dependencies]
+tokio-test = "0.4"
+
+[profile.release]
+opt-level = 3
+lto = true
+strip = true
