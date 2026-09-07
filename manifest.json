@@ -23,6 +23,7 @@
     "tabs",
     "storage",
     "nativeMessaging",
+    "webRequest",
     "<all_urls>"
   ],
 
@@ -30,6 +31,14 @@
     "scripts": ["background.js"],
     "persistent": true
   },
+
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
 
   "native_applications": {
     "zen_agentic_native": {
