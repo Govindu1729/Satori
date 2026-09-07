@@ -15,12 +15,17 @@ build/
 *.pyc
 *.class
 *.o
-*.exe
-*.dll
-*.so
-*.a
 *.obj
 *.out
+
+# Rust/Cargo
+Cargo.lock
+target/
+
+# Logs and temp files
+*.log
+*.tmp
+*.swp
 
 # Environment
 .env
@@ -30,30 +35,33 @@ build/
 # Editors
 .vscode/
 .idea/
-*.swp
-*.swo
-*.tmp
 
 # System
 .DS_Store
 Thumbs.db
-
-# Logs
-*.log
 
 # Coverage
 coverage/
 htmlcov/
 .coverage
 
-# Rust/Cargo specific
-Cargo.lock
-target/
-
-# Python specific
-*.pyc
-__pycache__/
-*.pyo
-*.pyd
-.Python
+# Compressed files
+*.zip
+*.gz
+*.tar
+*.tgz
+*.bz2
+*.xz
+*.7z
+*.rar
+*.zst
+*.lz4
+*.lzh
+*.cab
+*.arj
+*.rpm
+*.deb
+*.Z
+*.lz
+*.lzo
 ```
