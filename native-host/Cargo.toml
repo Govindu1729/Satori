@@ -14,7 +14,7 @@ serde_json = "1.0"
 # Async runtime
 tokio = { version = "1.0", features = ["full"] }
 
-# Logging
+# Logging (added)
 log = "0.4"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
@@ -23,19 +23,11 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 thiserror = "1.0"
 anyhow = "1.0"
 
-# Base64 encoding for binary data
+# Base64 and chrono (added)
 base64 = "0.21"
+chrono = "0.4"
 
-# Native messaging helper (optional, we can implement manually)
-# webextension-native-messaging = "0.1"
-
-# Screen capture (macOS only - conditional compilation)
-[target.'cfg(target_os = "macos")'.dependencies]
-screencapturekit = "0.2"
-objc2 = "0.5"
-objc2-foundation = "0.2"
-
-# Image encoding
+# Image encoding (for screen capture)
 image = { version = "0.24", default-features = false, features = ["jpeg", "png"] }
 
 # UUID for element identification
@@ -44,8 +36,10 @@ uuid = { version = "1.0", features = ["v4"] }
 # Runtime version info
 rustc_version_runtime = "0.3"
 
-# MCP SDK (when available)
-# mcp-sdk = "0.1"
+# CoreGraphics for screen capture (replaces screencapturekit)
+[target.'cfg(target_os = "macos")'.dependencies]
+core-graphics = "0.22"
+core-foundation = "0.9"
 
 [dev-dependencies]
 tokio-test = "0.4"
