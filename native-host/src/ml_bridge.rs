@@ -42,25 +42,25 @@ impl Default for MlBridgeConfig {
 #[derive(Debug, Serialize, Clone)]
 #[serde(tag = "action")]
 pub enum MlRequest {
-    #[serde(rename = "analyze_sentiment")]
+    #[serde(rename = "sentiment")]
     Sentiment { text: String },
 
-    #[serde(rename = "extract_entities")]
+    #[serde(rename = "entities")]
     Entities { text: String },
 
-    #[serde(rename = "summarize")]
+    #[serde(rename = "summary")]
     Summarize { text: String, max_length: Option<usize> },
 
-    #[serde(rename = "extract_keywords")]
+    #[serde(rename = "keywords")]
     Keywords { text: String, top_k: Option<usize> },
 
-    #[serde(rename = "generate_embedding")]
+    #[serde(rename = "embed")]
     Embedding { text: String },
 
-    #[serde(rename = "store_document")]
-    StoreDocument { id: String, text: String, meta Option<serde_json::Value> },
+    #[serde(rename = "rag_store")]
+    StoreDocument { id: String, text: String, metadata: Option<serde_json::Value> },
 
-    #[serde(rename = "query_rag")]
+    #[serde(rename = "rag_query")]
     RagQuery { query: String, top_k: Option<usize> },
 
     #[serde(rename = "generate_response")]
@@ -73,14 +73,19 @@ pub enum MlRequest {
 
     #[serde(rename = "heartbeat")]
     Heartbeat,
+
+    #[serde(rename = "shutdown")]
+    Shutdown,
 }
 
 /// Response types received from the Python backend
 #[derive(Debug, Deserialize, Clone)]
 pub struct MlResponse {
-    pub status: String, // "success" or "error"
-    pub  Option<serde_json::Value>,
-    pub message: Option<String>,
+    pub success: bool,
+    pub action: String,
+    pub data: Option<serde_json::Value>,
+    pub error: Option<String>,
+    pub latency_ms: Option<u64>,
 }
 
 /// Document for RAG storage
@@ -88,7 +93,7 @@ pub struct MlResponse {
 pub struct RagDocument {
     pub id: String,
     pub content: String,
-    pub meta HashMap<String, String>,
+    pub metadata: HashMap<String, String>,
     pub timestamp: u64,
 }
 
@@ -219,8 +224,8 @@ impl MlBridge {
             let response: MlResponse = serde_json::from_str(&line)
                 .map_err(|e| format!("Deserialization error: {}. Raw: {}", e, line))?;
 
-            if response.status == "error" {
-                return Err(response.message.unwrap_or_else(|| "Unknown Python error".to_string()));
+            if !response.success {
+                return Err(response.error.unwrap_or_else(|| "Unknown Python error".to_string()));
             }
 
             Ok(response)
@@ -263,7 +268,7 @@ impl MlBridge {
         }
     }
 
-    pub async fn store_document(&self, id: String, text: String, meta Option<serde_json::Value>) -> Result<bool, String> {
+    pub async fn store_document(&self, id: String, text: String, metadata: Option<serde_json::Value>) -> Result<bool, String> {
         let resp = self.send_request(MlRequest::StoreDocument { id, text, metadata }).await?;
         Ok(resp.status == "success")
     }
@@ -348,14 +353,17 @@ mod tests {
     #[test]
     fn test_response_deserialization() {
         let json = r#"{
-            "status": "success",
+            "success": true,
+            "action": "sentiment",
             "data": {"label": "positive", "score": 0.95},
-            "message": null
+            "error": null,
+            "latency_ms": 120
         }"#;
 
         let response: MlResponse = serde_json::from_str(json).unwrap();
-        assert_eq!(response.status, "success");
-        assert!(response.data.is_some());
+        assert!(response.success);
+        assert_eq!(response.action, "sentiment");
+        assert_eq!(response.latency_ms, Some(120));
     }
 
     #[test]
