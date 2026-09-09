@@ -34,12 +34,7 @@ struct AppState {
 impl AppState {
     fn new() -> Self {
         let ml_config = ml_bridge::MlBridgeConfig::default();
-        let mut ml_bridge = ml_bridge::MlBridge::new(ml_config);
-
-        // Try to initialize ML bridge, but don't fail if it's not available
-        if let Err(e) = ml_bridge.initialize() {
-            warn!("ML Bridge initialization failed (will retry on first use): {}", e);
-        }
+        let ml_bridge = ml_bridge::MlBridge::new(ml_config);
 
         Self {
             mcp_server: mcp_server::MCPServer::new(),
@@ -425,7 +420,12 @@ async fn handle_message(
 
             let mut state_locked = state.lock().await;
 
-            match state_locked.ml_bridge.analyze_sentiment(text) {
+            // Start ML bridge if not running
+            if let Err(e) = state_locked.ml_bridge.start().await {
+                warn!("ML Bridge start failed: {}", e);
+            }
+
+            match state_locked.ml_bridge.analyze_sentiment(text.to_string()).await {
                 Ok(result) => Ok(ipc::NativeMessage::response(
                     message.id,
                     result,
@@ -449,7 +449,12 @@ async fn handle_message(
 
             let mut state_locked = state.lock().await;
 
-            match state_locked.ml_bridge.extract_entities(text) {
+            // Start ML bridge if not running
+            if let Err(e) = state_locked.ml_bridge.start().await {
+                warn!("ML Bridge start failed: {}", e);
+            }
+
+            match state_locked.ml_bridge.extract_entities(text.to_string()).await {
                 Ok(result) => Ok(ipc::NativeMessage::response(
                     message.id,
                     result,
@@ -477,7 +482,12 @@ async fn handle_message(
 
             let mut state_locked = state.lock().await;
 
-            match state_locked.ml_bridge.summarize(text, max_length) {
+            // Start ML bridge if not running
+            if let Err(e) = state_locked.ml_bridge.start().await {
+                warn!("ML Bridge start failed: {}", e);
+            }
+
+            match state_locked.ml_bridge.summarize(text.to_string(), max_length).await {
                 Ok(result) => Ok(ipc::NativeMessage::response(
                     message.id,
                     result,
@@ -505,7 +515,12 @@ async fn handle_message(
 
             let mut state_locked = state.lock().await;
 
-            match state_locked.ml_bridge.extract_keywords(text, top_k) {
+            // Start ML bridge if not running
+            if let Err(e) = state_locked.ml_bridge.start().await {
+                warn!("ML Bridge start failed: {}", e);
+            }
+
+            match state_locked.ml_bridge.extract_keywords(text.to_string(), top_k).await {
                 Ok(result) => Ok(ipc::NativeMessage::response(
                     message.id,
                     result,
@@ -529,7 +544,12 @@ async fn handle_message(
 
             let mut state_locked = state.lock().await;
 
-            match state_locked.ml_bridge.generate_embedding(text) {
+            // Start ML bridge if not running
+            if let Err(e) = state_locked.ml_bridge.start().await {
+                warn!("ML Bridge start failed: {}", e);
+            }
+
+            match state_locked.ml_bridge.generate_embedding(text.to_string()).await {
                 Ok(result) => Ok(ipc::NativeMessage::response(
                     message.id,
                     result,
