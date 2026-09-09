@@ -11,7 +11,7 @@ mod screen_capture_kit;
 mod webdriver_bidi;
 mod ml_bridge;
 
-use anyhow::{Result}; // removed unused Context
+use anyhow::Result;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tracing::{info, error, warn, debug};
@@ -23,7 +23,7 @@ struct AppState {
     /// Screen capture engine
     screen_capture: screen_capture_kit::ScreenCaptureManager,
     /// WebDriver client for DOM automation
-    webdriver: webdriver_bidi::FirefoxWebDriver, // use concrete type
+    webdriver: webdriver_bidi::FirefoxWebDriver,
     /// ML Bridge for Python NLP backend
     ml_bridge: ml_bridge::MlBridge,
     /// Whether screen capture permission has been granted
@@ -35,7 +35,6 @@ impl AppState {
         let ml_config = ml_bridge::MlBridgeConfig::default();
         let ml_bridge = ml_bridge::MlBridge::new(ml_config);
 
-        // No initialize() call – the bridge will auto‑initialize on first use.
         Self {
             mcp_server: mcp_server::MCPServer::new(),
             screen_capture: screen_capture_kit::ScreenCaptureManager::new(),
@@ -51,20 +50,17 @@ async fn handle_message(
     state: Arc<Mutex<AppState>>,
     message: ipc::NativeMessage,
 ) -> Result<ipc::NativeMessage> {
-    // FIXED: use a distinct variable name to avoid shadowing
     let state_guard = state.lock().await;
 
     match message.method.as_str() {
-        // Basic ping/pong
         "ping" => Ok(ipc::NativeMessage::response(
             message.id,
             serde_json::json!({ "pong": true }),
         )),
 
-        // Initialize screen capture subsystem
         "init_screen_capture" => {
-            drop(state_guard); // release lock
-            let mut state_guard = state.lock().await; // re‑acquire
+            drop(state_guard);
+            let mut state_guard = state.lock().await;
 
             let has_permission = screen_capture_kit::ScreenCaptureManager::check_permission().await;
             state_guard.screen_capture_allowed = has_permission;
@@ -81,7 +77,6 @@ async fn handle_message(
             ))
         }
 
-        // Check screen capture permission status
         "check_screen_capture_permission" => {
             let has_permission = screen_capture_kit::ScreenCaptureManager::check_permission().await;
             Ok(ipc::NativeMessage::response(
@@ -90,7 +85,6 @@ async fn handle_message(
             ))
         }
 
-        // Request screen capture permission
         "request_screen_capture_permission" => {
             let granted = screen_capture_kit::ScreenCaptureManager::request_permission().await;
             Ok(ipc::NativeMessage::response(
@@ -99,7 +93,6 @@ async fn handle_message(
             ))
         }
 
-        // Enumerate available capture sources
         "enumerate_capture_sources" => {
             let mut manager = screen_capture_kit::ScreenCaptureManager::new();
             match manager.enumerate_sources().await {
@@ -115,7 +108,6 @@ async fn handle_message(
             }
         }
 
-        // Find windows for a specific application
         "find_application_windows" => {
             let params = message.params.as_object()
                 .ok_or_else(|| anyhow::anyhow!("Invalid params"))?;
@@ -133,7 +125,6 @@ async fn handle_message(
             ))
         }
 
-        // Find Zen browser windows specifically
         "find_zen_windows" => {
             let manager = screen_capture_kit::ScreenCaptureManager::new();
             let windows = manager.find_zen_windows().await;
@@ -144,7 +135,6 @@ async fn handle_message(
             ))
         }
 
-        // Configure stream for capturing
         "configure_stream" => {
             let params = message.params.as_object()
                 .ok_or_else(|| anyhow::anyhow!("Invalid params"))?;
@@ -177,9 +167,7 @@ async fn handle_message(
             }
         }
 
-        // Capture a single frame
         "capture_frame" => {
-            // use the guard
             match state_guard.screen_capture.capture_frame().await {
                 Ok(frame) => Ok(ipc::NativeMessage::response(
                     message.id,
@@ -193,7 +181,6 @@ async fn handle_message(
             }
         }
 
-        // Capture frame as JPEG
         "capture_frame_jpeg" => {
             match state_guard.screen_capture.capture_frame_jpeg().await {
                 Ok(jpeg_data) => {
@@ -217,7 +204,6 @@ async fn handle_message(
             }
         }
 
-        // Stop screen capture
         "stop_capture" => {
             Ok(ipc::NativeMessage::response(
                 message.id,
@@ -225,7 +211,6 @@ async fn handle_message(
             ))
         }
 
-        // List available MCP tools
         "list_mcp_tools" => {
             let tools = state_guard.mcp_server.list_tools();
             Ok(ipc::NativeMessage::response(
@@ -234,7 +219,6 @@ async fn handle_message(
             ))
         }
 
-        // Call an MCP tool
         "call_mcp_tool" => {
             let params = message.params.as_object()
                 .ok_or_else(|| anyhow::anyhow!("Invalid params"))?;
@@ -272,7 +256,6 @@ async fn handle_message(
             }
         }
 
-        // Connect to browser via WebDriver BiDi
         "connect_webdriver" => {
             let params = message.params.as_object()
                 .ok_or_else(|| anyhow::anyhow!("Invalid params"))?;
@@ -299,7 +282,6 @@ async fn handle_message(
             }
         }
 
-        // Take DOM snapshot via WebDriver
         "take_dom_snapshot" => {
             if !state_guard.webdriver.is_connected() {
                 return Ok(ipc::NativeMessage::error_response(
@@ -322,7 +304,6 @@ async fn handle_message(
             }
         }
 
-        // Click element by UID via WebDriver
         "webdriver_click" => {
             let params = message.params.as_object()
                 .ok_or_else(|| anyhow::anyhow!("Invalid params"))?;
@@ -352,7 +333,6 @@ async fn handle_message(
             }
         }
 
-        // Execute script via WebDriver
         "webdriver_execute_script" => {
             let params = message.params.as_object()
                 .ok_or_else(|| anyhow::anyhow!("Invalid params"))?;
@@ -386,7 +366,6 @@ async fn handle_message(
             }
         }
 
-        // Get version info
         "get_version" => {
             Ok(ipc::NativeMessage::response(
                 message.id,
@@ -398,7 +377,6 @@ async fn handle_message(
             ))
         }
 
-        // ML Bridge methods
         "ml_sentiment_analysis" => {
             let params = message.params.as_object()
                 .ok_or_else(|| anyhow::anyhow!("Invalid params"))?;
@@ -407,8 +385,6 @@ async fn handle_message(
                 .and_then(|v| v.as_str())
                 .ok_or_else(|| anyhow::anyhow!("Missing text"))?;
 
-            // need mutable access to ml_bridge if it modifies internal state
-            // but we can use the guard directly, no need to drop/re-acquire
             match state_guard.ml_bridge.analyze_sentiment(text).await {
                 Ok(result) => Ok(ipc::NativeMessage::response(
                     message.id,
@@ -422,10 +398,182 @@ async fn handle_message(
             }
         }
 
-        // ... (other ML methods similar – they can all use state_guard)
-        // For brevity I'll omit them here, but they follow the same pattern.
+        "ml_entity_extraction" => {
+            let params = message.params.as_object()
+                .ok_or_else(|| anyhow::anyhow!("Invalid params"))?;
 
-        // Unknown method
+            let text = params.get("text")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| anyhow::anyhow!("Missing text"))?;
+
+            match state_guard.ml_bridge.extract_entities(text).await {
+                Ok(result) => Ok(ipc::NativeMessage::response(
+                    message.id,
+                    result,
+                )),
+                Err(e) => Ok(ipc::NativeMessage::error_response(
+                    message.id,
+                    -32021,
+                    e.to_string(),
+                )),
+            }
+        }
+
+        "ml_summarize" => {
+            let params = message.params.as_object()
+                .ok_or_else(|| anyhow::anyhow!("Invalid params"))?;
+
+            let text = params.get("text")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| anyhow::anyhow!("Missing text"))?;
+
+            let max_length = params.get("max_length")
+                .and_then(|v| v.as_u64())
+                .map(|v| v as usize);
+
+            match state_guard.ml_bridge.summarize(text, max_length).await {
+                Ok(result) => Ok(ipc::NativeMessage::response(
+                    message.id,
+                    result,
+                )),
+                Err(e) => Ok(ipc::NativeMessage::error_response(
+                    message.id,
+                    -32022,
+                    e.to_string(),
+                )),
+            }
+        }
+
+        "ml_extract_keywords" => {
+            let params = message.params.as_object()
+                .ok_or_else(|| anyhow::anyhow!("Invalid params"))?;
+
+            let text = params.get("text")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| anyhow::anyhow!("Missing text"))?;
+
+            let top_k = params.get("top_k")
+                .and_then(|v| v.as_u64())
+                .map(|v| v as usize);
+
+            match state_guard.ml_bridge.extract_keywords(text, top_k).await {
+                Ok(result) => Ok(ipc::NativeMessage::response(
+                    message.id,
+                    result,
+                )),
+                Err(e) => Ok(ipc::NativeMessage::error_response(
+                    message.id,
+                    -32023,
+                    e.to_string(),
+                )),
+            }
+        }
+
+        "ml_generate_embedding" => {
+            let params = message.params.as_object()
+                .ok_or_else(|| anyhow::anyhow!("Invalid params"))?;
+
+            let text = params.get("text")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| anyhow::anyhow!("Missing text"))?;
+
+            match state_guard.ml_bridge.generate_embedding(text).await {
+                Ok(result) => Ok(ipc::NativeMessage::response(
+                    message.id,
+                    result,
+                )),
+                Err(e) => Ok(ipc::NativeMessage::error_response(
+                    message.id,
+                    -32024,
+                    e.to_string(),
+                )),
+            }
+        }
+
+        "ml_rag_query" => {
+            let params = message.params.as_object()
+                .ok_or_else(|| anyhow::anyhow!("Invalid params"))?;
+
+            let query = params.get("query")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| anyhow::anyhow!("Missing query"))?;
+
+            let top_k = params.get("top_k")
+                .and_then(|v| v.as_u64())
+                .map(|v| v as usize)
+                .unwrap_or(5);
+
+            match state_guard.ml_bridge.query_rag(query, top_k).await {
+                Ok(result) => Ok(ipc::NativeMessage::response(
+                    message.id,
+                    result,
+                )),
+                Err(e) => Ok(ipc::NativeMessage::error_response(
+                    message.id,
+                    -32025,
+                    e.to_string(),
+                )),
+            }
+        }
+
+        "ml_rag_store" => {
+            let params = message.params.as_object()
+                .ok_or_else(|| anyhow::anyhow!("Invalid params"))?;
+
+            let documents = params.get("documents")
+                .and_then(|v| v.as_array())
+                .ok_or_else(|| anyhow::anyhow!("Missing documents"))?;
+
+            let rag_docs: Result<Vec<ml_bridge::RagDocument>, _> = documents.iter().map(|doc| {
+                let id = doc.get("id").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                let content = doc.get("content").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                let metadata = doc.get("metadata")
+                    .and_then(|v| v.as_object())
+                    .map(|m| m.iter().map(|(k, v)| (k.clone(), v.as_str().unwrap_or("").to_string())).collect())
+                    .unwrap_or_default();
+                let timestamp = doc.get("timestamp").and_then(|v| v.as_u64()).unwrap_or(0);
+
+                Ok(ml_bridge::RagDocument {
+                    id,
+                    content,
+                    meta: metadata,
+                    timestamp,
+                })
+            }).collect();
+
+            match rag_docs {
+                Ok(docs) => {
+                    match state_guard.ml_bridge.rag_store(docs).await {
+                        Ok(result) => Ok(ipc::NativeMessage::response(
+                            message.id,
+                            result,
+                        )),
+                        Err(e) => Ok(ipc::NativeMessage::error_response(
+                            message.id,
+                            -32026,
+                            e.to_string(),
+                        )),
+                    }
+                },
+                Err(e) => Ok(ipc::NativeMessage::error_response(
+                    message.id,
+                    -32027,
+                    e.to_string(),
+                )),
+            }
+        }
+
+        "ml_health_check" => {
+            let is_healthy = state_guard.ml_bridge.is_healthy().await;
+
+            Ok(ipc::NativeMessage::response(
+                message.id,
+                serde_json::json!({
+                    "healthy": is_healthy,
+                }),
+            ))
+        }
+
         _ => Ok(ipc::NativeMessage::error_response(
             message.id,
             -32601,
@@ -489,7 +637,6 @@ async fn run_message_loop() -> Result<()> {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    // Initialize logging
     tracing_subscriber::fmt()
         .with_env_filter(
             tracing_subscriber::EnvFilter::from_default_env()
@@ -509,7 +656,6 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-// Runtime version helper
 mod rustc_version_runtime {
     pub fn version() -> String {
         format!("{}", ::rustc_version_runtime::version())
