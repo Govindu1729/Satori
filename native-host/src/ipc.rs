@@ -8,7 +8,7 @@
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::io::{self, Read, Write};
-use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
+use tokio::io::{AsyncReadExt, AsyncWriteExt}; // removed unused AsyncBufReadExt, BufReader
 
 /// Maximum message size as per WebExtensions standard (1 MB)
 pub const MAX_MESSAGE_SIZE: u32 = 1024 * 1024;
