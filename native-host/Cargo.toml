@@ -14,7 +14,7 @@ serde_json = "1.0"
 # Async runtime
 tokio = { version = "1.0", features = ["full"] }
 
-# Logging (added)
+# Logging
 log = "0.4"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
@@ -23,7 +23,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 thiserror = "1.0"
 anyhow = "1.0"
 
-# Base64 and chrono (added)
+# Base64 and chrono for ML and timestamps
 base64 = "0.21"
 chrono = "0.4"
 
@@ -36,7 +36,7 @@ uuid = { version = "1.0", features = ["v4"] }
 # Runtime version info
 rustc_version_runtime = "0.3"
 
-# CoreGraphics for screen capture (replaces screencapturekit)
+# CoreGraphics for screen capture (macOS only)
 [target.'cfg(target_os = "macos")'.dependencies]
 core-graphics = "0.22"
 core-foundation = "0.9"
