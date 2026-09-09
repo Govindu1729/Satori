@@ -8,7 +8,7 @@
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::io::{self, Read, Write};
-use tokio::io::{AsyncReadExt, AsyncWriteExt}; // removed unused AsyncBufReadExt, BufReader
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 /// Maximum message size as per WebExtensions standard (1 MB)
 pub const MAX_MESSAGE_SIZE: u32 = 1024 * 1024;
@@ -101,7 +101,6 @@ impl NativeMessage {
 
 /// Read a single native message from stdin (blocking)
 pub fn read_message_blocking<R: Read>(reader: &mut R) -> Result<Option<NativeMessage>> {
-    // Read 4-byte length prefix
     let mut len_buf = [0u8; 4];
     match reader.read_exact(&mut len_buf) {
         Ok(_) => {},
@@ -115,7 +114,6 @@ pub fn read_message_blocking<R: Read>(reader: &mut R) -> Result<Option<NativeMes
         anyhow::bail!("Message length {} exceeds maximum {}", message_len, MAX_MESSAGE_SIZE);
     }
 
-    // Read payload
     let mut payload = vec![0u8; message_len as usize];
     reader.read_exact(&mut payload)
         .context("Failed to read message payload")?;
@@ -134,7 +132,6 @@ pub fn write_message_blocking<W: Write>(writer: &mut W, message: &NativeMessage)
 
 /// Async version: Read a single native message from stdin
 pub async fn read_message_async<R: AsyncReadExt + Unpin>(reader: &mut R) -> Result<Option<NativeMessage>> {
-    // Read 4-byte length prefix
     let mut len_buf = [0u8; 4];
     match reader.read_exact(&mut len_buf).await {
         Ok(_) => {},
@@ -148,7 +145,6 @@ pub async fn read_message_async<R: AsyncReadExt + Unpin>(reader: &mut R) -> Resu
         anyhow::bail!("Message length {} exceeds maximum {}", message_len, MAX_MESSAGE_SIZE);
     }
 
-    // Read payload
     let mut payload = vec![0u8; message_len as usize];
     reader.read_exact(&mut payload).await
         .context("Failed to read message payload")?;
@@ -173,11 +169,6 @@ mod tests {
     fn test_message_serialization() {
         let msg = NativeMessage::request("test-1", "ping", serde_json::json!({}));
         let bytes = msg.to_bytes().unwrap();
-
-        // First 4 bytes should be length
-        assert_eq!(bytes.len(), 4 + msg.to_bytes().unwrap().len() - 4);
-
-        // Deserialize back
         let payload = &bytes[4..];
         let decoded = NativeMessage::from_bytes(payload).unwrap();
         assert_eq!(decoded.id, "test-1");
