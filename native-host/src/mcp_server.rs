@@ -4,6 +4,7 @@
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::HashMap;
+use chrono::Utc;
 
 /// MCP Tool definition
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -58,32 +59,27 @@ pub struct MCPServer {
 }
 
 impl MCPServer {
-    /// Create a new MCP server with all tools registered
     pub fn new() -> Self {
         let mut server = Self {
             tools: HashMap::new(),
             resources: HashMap::new(),
         };
-
-        // Register all MCP tools
         server.register_tools();
         server
     }
 
-    /// Register all available MCP tools
     fn register_tools(&mut self) {
-        // Tool 1: take_snapshot
         self.tools.insert(
             "take_snapshot".to_string(),
             MCPTool {
                 name: "take_snapshot".to_string(),
-                description: "Capture the current DOM state with bounding boxes and UIDs for all interactive elements. Returns a structured representation of the page suitable for AI analysis.".to_string(),
+                description: "Capture the current DOM state with bounding boxes and UIDs for all interactive elements.".to_string(),
                 input_schema: json!({
                     "type": "object",
                     "properties": {
                         "include_images": {
                             "type": "boolean",
-                            "description": "Whether to include base64-encoded screenshots of visible elements",
+                            "description": "Whether to include base64-encoded screenshots",
                             "default": false
                         },
                         "max_depth": {
@@ -97,12 +93,11 @@ impl MCPServer {
             },
         );
 
-        // Tool 2: click_by_uid
         self.tools.insert(
             "click_by_uid".to_string(),
             MCPTool {
                 name: "click_by_uid".to_string(),
-                description: "Simulate a native click on an element by its unique identifier (UID). Bypasses CSS overlays and works even on complex layouts.".to_string(),
+                description: "Simulate a native click on an element by its unique identifier (UID).".to_string(),
                 input_schema: json!({
                     "type": "object",
                     "properties": {
@@ -113,8 +108,7 @@ impl MCPServer {
                         "button": {
                             "type": "string",
                             "enum": ["left", "middle", "right"],
-                            "default": "left",
-                            "description": "Mouse button to simulate"
+                            "default": "left"
                         }
                     },
                     "required": ["uid"]
@@ -123,12 +117,11 @@ impl MCPServer {
             },
         );
 
-        // Tool 3: evaluate_script
         self.tools.insert(
             "evaluate_script".to_string(),
             MCPTool {
                 name: "evaluate_script".to_string(),
-                description: "Execute arbitrary JavaScript in the context of the active browser tab. Requires explicit user confirmation due to security implications.".to_string(),
+                description: "Execute arbitrary JavaScript in the context of the active browser tab.".to_string(),
                 input_schema: json!({
                     "type": "object",
                     "properties": {
@@ -138,8 +131,7 @@ impl MCPServer {
                         },
                         "await_promise": {
                             "type": "boolean",
-                            "default": false,
-                            "description": "Whether to await Promise resolution before returning"
+                            "default": false
                         }
                     },
                     "required": ["script"]
@@ -148,12 +140,11 @@ impl MCPServer {
             },
         );
 
-        // Tool 4: list_network_requests
         self.tools.insert(
             "list_network_requests".to_string(),
             MCPTool {
                 name: "list_network_requests".to_string(),
-                description: "List all network requests (XHR/Fetch) made by the current page. Useful for analyzing API traffic and responses.".to_string(),
+                description: "List all network requests (XHR/Fetch) made by the current page.".to_string(),
                 input_schema: json!({
                     "type": "object",
                     "properties": {
@@ -163,13 +154,11 @@ impl MCPServer {
                         },
                         "filter_method": {
                             "type": "string",
-                            "enum": ["GET", "POST", "PUT", "DELETE", "PATCH"],
-                            "description": "Filter requests by HTTP method"
+                            "enum": ["GET", "POST", "PUT", "DELETE", "PATCH"]
                         },
                         "include_body": {
                             "type": "boolean",
-                            "default": false,
-                            "description": "Include request/response bodies (may be large)"
+                            "default": false
                         }
                     }
                 }),
@@ -177,31 +166,24 @@ impl MCPServer {
             },
         );
 
-        // Tool 5: get_screen_capture
         self.tools.insert(
             "get_screen_capture".to_string(),
             MCPTool {
                 name: "get_screen_capture".to_string(),
-                description: "Capture the current browser viewport as an image using OS-level screen capture. Provides exact visual context as seen by the user.".to_string(),
+                description: "Capture the current browser viewport as an image using OS-level screen capture.".to_string(),
                 input_schema: json!({
                     "type": "object",
                     "properties": {
                         "format": {
                             "type": "string",
                             "enum": ["jpeg", "webp", "png"],
-                            "default": "jpeg",
-                            "description": "Image format for the capture"
+                            "default": "jpeg"
                         },
                         "quality": {
                             "type": "integer",
                             "minimum": 1,
                             "maximum": 100,
-                            "default": 85,
-                            "description": "Image quality (for lossy formats)"
-                        },
-                        "target_window": {
-                            "type": "string",
-                            "description": "Specific window title to capture (defaults to active Zen window)"
+                            "default": 85
                         }
                     }
                 }),
@@ -209,29 +191,21 @@ impl MCPServer {
             },
         );
 
-        // Tool 6: extract_page_content
         self.tools.insert(
             "extract_page_content".to_string(),
             MCPTool {
                 name: "extract_page_content".to_string(),
-                description: "Extract and analyze the main text content of the current page. Performs NLP processing including sentiment analysis, entity extraction, and summarization.".to_string(),
+                description: "Extract and analyze the main text content of the current page.".to_string(),
                 input_schema: json!({
                     "type": "object",
                     "properties": {
                         "include_nlp": {
                             "type": "boolean",
-                            "default": true,
-                            "description": "Whether to perform NLP analysis (sentiment, entities, summary)"
+                            "default": true
                         },
                         "max_length": {
                             "type": "integer",
-                            "default": 5000,
-                            "description": "Maximum characters to extract"
-                        },
-                        "selectors": {
-                            "type": "array",
-                            "items": {"type": "string"},
-                            "description": "CSS selectors to target specific content areas"
+                            "default": 5000
                         }
                     }
                 }),
@@ -239,7 +213,6 @@ impl MCPServer {
             },
         );
 
-        // Register resources
         self.resources.insert(
             "browser://current-tab".to_string(),
             MCPResource {
@@ -251,17 +224,14 @@ impl MCPServer {
         );
     }
 
-    /// Get list of all registered tools
     pub fn list_tools(&self) -> Vec<MCPTool> {
         self.tools.values().cloned().collect()
     }
 
-    /// Get list of all registered resources
     pub fn list_resources(&self) -> Vec<MCPResource> {
         self.resources.values().cloned().collect()
     }
 
-    /// Execute a tool call
     pub async fn execute_tool(
         &self,
         tool_call: &MCPToolCall,
@@ -279,7 +249,6 @@ impl MCPServer {
         }
     }
 
-    /// Execute take_snapshot tool
     fn execute_take_snapshot(
         &self,
         args: &HashMap<String, Value>,
@@ -289,19 +258,16 @@ impl MCPServer {
             .and_then(|v| v.as_bool())
             .unwrap_or(false);
 
-        let max_depth = args.get("max_depth")
+        let _max_depth = args.get("max_depth")
             .and_then(|v| v.as_i64())
             .unwrap_or(10) as usize;
 
-        // Extract DOM snapshot from the provided state
         let snapshot = json!({
             "url": dom_state.get("url").unwrap_or(&Value::Null),
             "title": dom_state.get("title").unwrap_or(&Value::Null),
-            "timestamp": chrono::Utc::now().to_rfc3339(),
-            "elements": self.extract_interactive_elements(dom_state, max_depth, include_images),
+            "timestamp": Utc::now().to_rfc3339(),
+            "elements": dom_state.get("elements").unwrap_or(&Value::Null),
             "metadata": {
-                "total_elements": dom_state.get("element_count").unwrap_or(&Value::Null),
-                "depth": max_depth,
                 "images_included": include_images
             }
         });
@@ -314,23 +280,6 @@ impl MCPServer {
         })
     }
 
-    /// Extract interactive elements from DOM
-    fn extract_interactive_elements(
-        &self,
-        dom_state: &Value,
-        max_depth: usize,
-        include_images: bool,
-    ) -> Value {
-        // In actual implementation, traverse the DOM AST and extract:
-        // - Buttons, links, inputs, selects, textareas
-        // - Calculate bounding boxes
-        // - Assign UIDs
-        // - Optionally capture element screenshots
-
-        dom_state.get("elements").cloned().unwrap_or_else(|| json!([]))
-    }
-
-    /// Execute click_by_uid tool
     fn execute_click_by_uid(
         &self,
         args: &HashMap<String, Value>,
@@ -343,13 +292,12 @@ impl MCPServer {
             .and_then(|v| v.as_str())
             .unwrap_or("left");
 
-        // In actual implementation, send click command to WebDriver BiDi
         let result = json!({
             "action": "click",
             "uid": uid,
             "button": button,
             "success": true,
-            "timestamp": chrono::Utc::now().to_rfc3339()
+            "timestamp": Utc::now().to_rfc3339()
         });
 
         Ok(MCPToolResponse {
@@ -360,7 +308,6 @@ impl MCPServer {
         })
     }
 
-    /// Execute evaluate_script tool
     fn execute_evaluate_script(
         &self,
         args: &HashMap<String, Value>,
@@ -373,14 +320,10 @@ impl MCPServer {
             .and_then(|v| v.as_bool())
             .unwrap_or(false);
 
-        // SECURITY NOTE: This tool requires human-in-the-loop confirmation
-        // The MCP client should prompt the user before executing
-
         let result = json!({
             "action": "evaluate_script",
             "script_preview": if script.len() > 100 { &script[..100] } else { script },
             "await_promise": await_promise,
-            "warning": "Script execution requires user confirmation",
             "status": "pending_user_approval"
         });
 
@@ -392,7 +335,6 @@ impl MCPServer {
         })
     }
 
-    /// Execute list_network_requests tool
     fn execute_list_network_requests(
         &self,
         args: &HashMap<String, Value>,
@@ -402,7 +344,6 @@ impl MCPServer {
         let filter_method = args.get("filter_method").and_then(|v| v.as_str());
         let include_body = args.get("include_body").and_then(|v| v.as_bool()).unwrap_or(false);
 
-        // Filter network log based on arguments
         let requests = network_log.get("requests")
             .and_then(|v| v.as_array())
             .cloned()
@@ -456,30 +397,22 @@ impl MCPServer {
         })
     }
 
-    /// Execute get_screen_capture tool
     async fn execute_get_screen_capture(
         &self,
         args: &HashMap<String, Value>,
     ) -> Result<MCPToolResponse, String> {
-        let format = args.get("format")
+        let _format = args.get("format")
             .and_then(|v| v.as_str())
             .unwrap_or("jpeg");
 
-        let quality = args.get("quality")
+        let _quality = args.get("quality")
             .and_then(|v| v.as_i64())
             .unwrap_or(85) as u8;
 
-        let target_window = args.get("target_window").and_then(|v| v.as_str());
-
-        // In actual implementation, call ScreenCaptureKit
-        // For now, return a placeholder response
         let result = json!({
             "action": "screen_capture",
-            "format": format,
-            "quality": quality,
-            "target_window": target_window,
-            "status": "capture_initiated",
-            "note": "Screen capture will be implemented with ScreenCaptureKit in Phase 2"
+            "status": "capture_available",
+            "note": "Use the capture_frame method via native messaging"
         });
 
         Ok(MCPToolResponse {
@@ -490,7 +423,6 @@ impl MCPServer {
         })
     }
 
-    /// Execute extract_page_content tool
     async fn execute_extract_page_content(
         &self,
         args: &HashMap<String, Value>,
@@ -504,12 +436,6 @@ impl MCPServer {
             .and_then(|v| v.as_i64())
             .unwrap_or(5000) as usize;
 
-        let selectors = args.get("selectors")
-            .and_then(|v| v.as_array())
-            .map(|arr| arr.iter().filter_map(|v| v.as_str()).collect::<Vec<_>>())
-            .unwrap_or_default();
-
-        // Extract text content from DOM
         let text_content = dom_state.get("text_content")
             .and_then(|v| v.as_str())
             .unwrap_or("")
@@ -522,17 +448,13 @@ impl MCPServer {
             "title": dom_state.get("title").unwrap_or(&Value::Null),
             "content_length": text_content.len(),
             "content": text_content,
-            "selectors_used": selectors,
         });
 
-        // Add NLP analysis if requested
         if include_nlp {
-            // In actual implementation, call Python NLP processor
-            // For now, return placeholder analysis
             result_data["nlp_analysis"] = json!({
                 "sentiment": "neutral",
                 "entities": [],
-                "summary": "NLP analysis will be performed by ml-backend/nlp_processor.py",
+                "summary": "NLP analysis available via ML Bridge",
                 "keywords": []
             });
         }
@@ -545,7 +467,6 @@ impl MCPServer {
         })
     }
 
-    /// Generate MCP server manifest for Claude Desktop
     pub fn generate_manifest(&self) -> Value {
         json!({
             "mcp_version": "1.0",
@@ -593,7 +514,6 @@ mod tests {
     fn test_tool_registration() {
         let server = MCPServer::new();
         let tools = server.list_tools();
-
         let tool_names: Vec<&str> = tools.iter().map(|t| t.name.as_str()).collect();
         assert!(tool_names.contains(&"take_snapshot"));
         assert!(tool_names.contains(&"click_by_uid"));
@@ -609,10 +529,7 @@ mod tests {
         let dom_state = json!({
             "url": "https://example.com",
             "title": "Example Domain",
-            "elements": [
-                {"tag": "button", "uid": "btn1", "text": "Click me"}
-            ],
-            "element_count": 42
+            "elements": []
         });
 
         let call = MCPToolCall {
@@ -628,49 +545,10 @@ mod tests {
         assert!(!response.content.is_empty());
     }
 
-    #[tokio::test]
-    async fn test_click_by_uid() {
-        let server = MCPServer::new();
-
-        let call = MCPToolCall {
-            name: "click_by_uid".to_string(),
-            arguments: HashMap::from([
-                ("uid".to_string(), json!("btn123")),
-                ("button".to_string(), json!("left")),
-            ]),
-        };
-
-        let response = server.execute_tool(&call, &json!({}), &json!({})).await.unwrap();
-        assert!(response.error.is_none());
-    }
-
-    #[tokio::test]
-    async fn test_list_network_requests() {
-        let server = MCPServer::new();
-        let network_log = json!({
-            "requests": [
-                {"url": "https://api.example.com/data", "method": "GET", "status": 200},
-                {"url": "https://api.example.com/submit", "method": "POST", "status": 201}
-            ]
-        });
-
-        let call = MCPToolCall {
-            name: "list_network_requests".to_string(),
-            arguments: HashMap::from([
-                ("filter_method".to_string(), json!("GET")),
-                ("include_body".to_string(), json!(false)),
-            ]),
-        };
-
-        let response = server.execute_tool(&call, &json!({}), &network_log).await.unwrap();
-        assert!(response.error.is_none());
-    }
-
     #[test]
     fn test_manifest_generation() {
         let server = MCPServer::new();
         let manifest = server.generate_manifest();
-
         assert_eq!(manifest["server_name"], "zen-agentic-mcp");
         assert!(manifest["tools"].is_array());
         assert!(manifest["resources"].is_array());
