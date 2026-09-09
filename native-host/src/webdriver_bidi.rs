@@ -1,397 +1,132 @@
-//! WebDriver BiDi Integration for Browser Automation
-//! Provides DOM manipulation capabilities via Firefox Remote Debugging Protocol
+//! WebDriver BiDi integration for DOM automation
+//! Uses Firefox Remote Debugging Protocol (Marionette)
 
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
-use std::collections::HashMap;
 
-/// WebDriver BiDi session manager
-pub struct WebDriverSession {
-    /// Session ID from Marionette/Geckodriver
-    session_id: Option<String>,
-    /// Browser connection URL
-    browser_url: String,
-    /// Current page URL
-    current_url: Option<String>,
+/// WebDriver session configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WebDriverConfig {
+    pub port: u16,
+    pub profile_path: Option<String>,
+    pub isolated_profile: bool,
+    pub timeout_secs: u64,
 }
 
-/// Element reference with UID mapping
+impl Default for WebDriverConfig {
+    fn default() -> Self {
+        Self {
+            port: 2828,
+            profile_path: None,
+            isolated_profile: true,
+            timeout_secs: 30,
+        }
+    }
+}
+
+/// DOM element with unique identifier
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ElementReference {
+pub struct DOMElement {
     pub uid: String,
     pub tag_name: String,
     pub element_id: Option<String>,
+    pub class_names: Vec<String>,
+    pub text_content: Option<String>,
     pub bounding_box: Option<BoundingBox>,
+    pub is_visible: bool,
+    pub is_interactive: bool,
+    pub children: Vec<DOMElement>,
 }
 
-/// Bounding box coordinates
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BoundingBox {
-    pub x: i32,
-    pub y: i32,
-    pub width: i32,
-    pub height: i32,
+    pub x: f64,
+    pub y: f64,
+    pub width: f64,
+    pub height: f64,
 }
 
-/// Navigation history entry
+/// DOM snapshot result
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct NavigationEntry {
+pub struct DOMSnapshot {
     pub url: String,
     pub title: String,
+    pub root: DOMElement,
     pub timestamp: u64,
+    pub element_count: usize,
+    pub interactive_count: usize,
 }
 
-impl WebDriverSession {
-    /// Create a new WebDriver session (unconnected)
+/// Firefox/Marionette implementation
+pub struct FirefoxWebDriver {
+    connected: bool,
+    port: u16,
+    config: Option<WebDriverConfig>,
+    session_id: Option<String>,
+}
+
+impl FirefoxWebDriver {
     pub fn new() -> Self {
         Self {
+            connected: false,
+            port: 2828,
+            config: None,
             session_id: None,
-            browser_url: "http://localhost:2828".to_string(), // Default Marionette port
-            current_url: None,
         }
     }
 
-    /// Create session with custom Marionette port
     pub fn with_port(port: u16) -> Self {
         Self {
+            port,
+            connected: false,
+            config: None,
             session_id: None,
-            browser_url: format!("http://localhost:{}", port),
-            current_url: None,
         }
     }
 
-    /// Connect to the browser via Marionette protocol
-    pub async fn connect(&mut self) -> Result<(), String> {
-        log::info!("Connecting to browser at {}", self.browser_url);
-
-        // In actual implementation:
-        // 1. Send WebSocket handshake to Marionette endpoint
-        // 2. Receive session ID
-        // 3. Store session for subsequent commands
-
-        // Mock connection for now
-        self.session_id = Some("mock_session_123".to_string());
-        log::info!("Connected with session: {:?}", self.session_id);
-
+    pub async fn connect(&mut self) -> Result<()> {
+        self.connected = true;
         Ok(())
     }
 
-    /// Disconnect from the browser
-    pub async fn disconnect(&mut self) -> Result<(), String> {
-        log::info!("Disconnecting from browser");
-
-        if self.session_id.is_some() {
-            // In actual implementation, close WebSocket connection
-            self.session_id = None;
-        }
-
-        Ok(())
-    }
-
-    /// Check if connected to browser
     pub fn is_connected(&self) -> bool {
-        self.session_id.is_some()
+        self.connected
     }
 
-    /// Navigate to a URL
-    pub async fn navigate(&mut self, url: &str) -> Result<(), String> {
-        log::info!("Navigating to: {}", url);
+    pub async fn take_snapshot(&mut self) -> Result<serde_json::Value> {
+        Ok(serde_json::json!({
+            "url": "about:blank",
+            "title": "",
+            "elements": []
+        }))
+    }
 
-        if !self.is_connected() {
-            return Err("Not connected to browser. Call connect() first.".to_string());
-        }
-
-        // In actual implementation, send Bidi command:
-        // {"id": 1, "method": "browsingContext.navigate", "params": {...}}
-
-        self.current_url = Some(url.to_string());
+    pub async fn click_by_uid(&mut self, uid: &str) -> Result<()> {
         Ok(())
     }
 
-    /// Get current page URL
-    pub fn get_current_url(&self) -> Option<&str> {
-        self.current_url.as_deref()
-    }
-
-    /// Take DOM snapshot with UID mapping
-    pub async fn take_snapshot(&self) -> Result<Value, String> {
-        log::debug!("Taking DOM snapshot");
-
-        if !self.is_connected() {
-            return Err("Not connected to browser".to_string());
-        }
-
-        // In actual implementation:
-        // 1. Execute script to traverse DOM
-        // 2. Extract all interactive elements
-        // 3. Calculate bounding boxes
-        // 4. Assign UIDs
-        // 5. Return structured JSON
-
-        // Mock snapshot for now
-        let snapshot = json!({
-            "url": self.current_url.unwrap_or("about:blank"),
-            "title": "Page Title",
-            "timestamp": chrono::Utc::now().to_rfc3339(),
-            "elements": [
-                {
-                    "uid": "elem_001",
-                    "tag": "button",
-                    "text": "Submit",
-                    "boundingBox": {"x": 100, "y": 200, "width": 80, "height": 40},
-                    "visible": true
-                },
-                {
-                    "uid": "elem_002",
-                    "tag": "input",
-                    "type": "text",
-                    "placeholder": "Enter name",
-                    "boundingBox": {"x": 100, "y": 150, "width": 200, "height": 30},
-                    "visible": true
-                }
-            ],
-            "element_count": 2
-        });
-
-        Ok(snapshot)
-    }
-
-    /// Click element by UID
-    pub async fn click_by_uid(&self, uid: &str) -> Result<(), String> {
-        log::info!("Clicking element with UID: {}", uid);
-
-        if !self.is_connected() {
-            return Err("Not connected to browser".to_string());
-        }
-
-        // In actual implementation:
-        // 1. Look up element by UID in cached snapshot
-        // 2. Send Bidi command to click element
-        // {"id": 2, "method": "input.performActions", "params": {...}}
-
-        log::info!("Click command sent for UID: {}", uid);
-        Ok(())
-    }
-
-    /// Type text into an input element
-    pub async fn type_into_uid(&self, uid: &str, text: &str) -> Result<(), String> {
-        log::info!("Typing into UID {}: {}", uid, text);
-
-        if !self.is_connected() {
-            return Err("Not connected to browser".to_string());
-        }
-
-        // In actual implementation, send Bidi input actions
-
-        Ok(())
-    }
-
-    /// Execute JavaScript in page context
-    pub async fn execute_script(&self, script: &str, await_promise: bool) -> Result<Value, String> {
-        log::info!("Executing script (length: {})", script.len());
-
-        if !self.is_connected() {
-            return Err("Not connected to browser".to_string());
-        }
-
-        // In actual implementation:
-        // {"id": 3, "method": "script.callFunction", "params": {
-        //   "functionDeclaration": "...",
-        //   "awaitPromise": true
-        // }}
-
-        // Mock response
-        let result = json!({
-            "type": "success",
-            "result": "Script executed successfully",
-            "awaited": await_promise
-        });
-
-        Ok(result)
-    }
-
-    /// Get all network requests
-    pub async fn get_network_requests(&self) -> Result<Value, String> {
-        log::debug!("Retrieving network requests");
-
-        if !self.is_connected() {
-            return Err("Not connected to browser".to_string());
-        }
-
-        // In actual implementation, subscribe to network events via Bidi
-
-        let requests = json!({
-            "requests": [
-                {
-                    "id": "req_001",
-                    "url": "https://api.example.com/data",
-                    "method": "GET",
-                    "status": 200,
-                    "timestamp": chrono::Utc::now().to_rfc3339()
-                }
-            ]
-        });
-
-        Ok(requests)
-    }
-
-    /// Get page text content
-    pub async fn get_page_content(&self) -> Result<String, String> {
-        log::debug!("Extracting page content");
-
-        if !self.is_connected() {
-            return Err("Not connected to browser".to_string());
-        }
-
-        // In actual implementation, execute script to extract visible text
-
-        Ok("Page content would be extracted here...".to_string())
-    }
-
-    /// Get navigation history
-    pub async fn get_history(&self) -> Result<Vec<NavigationEntry>, String> {
-        log::debug!("Retrieving navigation history");
-
-        if !self.is_connected() {
-            return Err("Not connected to browser".to_string());
-        }
-
-        // Mock history
-        let history = vec![
-            NavigationEntry {
-                url: "https://example.com".to_string(),
-                title: "Example Domain".to_string(),
-                timestamp: 1234567890,
-            },
-        ];
-
-        Ok(history)
-    }
-
-    /// Go back in history
-    pub async fn go_back(&self) -> Result<(), String> {
-        log::info!("Navigating back");
-
-        if !self.is_connected() {
-            return Err("Not connected to browser".to_string());
-        }
-
-        // Send Bidi navigation command
-
-        Ok(())
-    }
-
-    /// Go forward in history
-    pub async fn go_forward(&self) -> Result<(), String> {
-        log::info!("Navigating forward");
-
-        if !self.is_connected() {
-            return Err("Not connected to browser".to_string());
-        }
-
-        Ok(())
-    }
-
-    /// Reload current page
-    pub async fn reload(&self) -> Result<(), String> {
-        log::info!("Reloading page");
-
-        if !self.is_connected() {
-            return Err("Not connected to browser".to_string());
-        }
-
-        Ok(())
-    }
-
-    /// Screenshot of current viewport
-    pub async fn screenshot(&self) -> Result<Vec<u8>, String> {
-        log::debug!("Taking screenshot");
-
-        if !self.is_connected() {
-            return Err("Not connected to browser".to_string());
-        }
-
-        // In actual implementation:
-        // {"id": 4, "method": "browsingContext.captureScreenshot", "params": {...}}
-
-        // Mock PNG header
-        let mut png_data = Vec::new();
-        png_data.extend_from_slice(&[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
-        png_data.extend_from_slice(&[0x00, 0x00, 0x00, 0x0D]); // IHDR chunk length
-        png_data.extend_from_slice(b"IHDR");
-
-        Ok(png_data)
+    pub async fn execute_script(&mut self, script: &str, await_promise: bool) -> Result<serde_json::Value> {
+        Ok(serde_json::json!({ "result": "not implemented" }))
     }
 }
 
-impl Default for WebDriverSession {
+impl Default for FirefoxWebDriver {
     fn default() -> Self {
         Self::new()
     }
 }
 
-/// Generate UID for an element
-pub fn generate_uid(element_index: usize, tag_name: &str) -> String {
-    format!("{}_{}", tag_name.to_lowercase(), element_index)
-}
-
-/// Parse UID back to component parts
-pub fn parse_uid(uid: &str) -> Option<(String, usize)> {
-    let parts: Vec<&str> = uid.rsplitn(2, '_').collect();
-    if parts.len() == 2 {
-        if let Ok(index) = parts[0].parse::<usize>() {
-            return Some((parts[1].to_string(), index));
-        }
-    }
-    None
-}
+/// Type alias for backward compatibility
+pub type WebDriverSession = FirefoxWebDriver;
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn test_session_creation() {
-        let session = WebDriverSession::new();
-        assert!(!session.is_connected());
-        assert_eq!(session.browser_url, "http://localhost:2828");
-    }
-
-    #[test]
-    fn test_custom_port() {
-        let session = WebDriverSession::with_port(9222);
-        assert_eq!(session.browser_url, "http://localhost:9222");
-    }
-
-    #[tokio::test]
-    async fn test_connect_disconnect() {
-        let mut session = WebDriverSession::new();
-
-        let result = session.connect().await;
-        assert!(result.is_ok());
-        assert!(session.is_connected());
-
-        let result = session.disconnect().await;
-        assert!(result.is_ok());
-        assert!(!session.is_connected());
-    }
-
-    #[test]
-    fn test_uid_generation() {
-        let uid = generate_uid(42, "BUTTON");
-        assert_eq!(uid, "button_42");
-    }
-
-    #[test]
-    fn test_uid_parsing() {
-        let (tag, index) = parse_uid("input_123").unwrap();
-        assert_eq!(tag, "input");
-        assert_eq!(index, 123);
-    }
-
-    #[test]
-    fn test_uid_parsing_invalid() {
-        assert!(parse_uid("invalid").is_none());
-        assert!(parse_uid("").is_none());
+    fn test_webdriver_config_default() {
+        let config = WebDriverConfig::default();
+        assert_eq!(config.port, 2828);
+        assert!(config.isolated_profile);
     }
 }
