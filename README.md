@@ -9,7 +9,7 @@ This project bridges Zen Browser (Firefox fork) with local AI agents through a m
 - **WebExtension**: Next.js/React sidebar UI using Firefox WebExtensions API
 - **Native Host**: Rust binary handling IPC, screen capture, and MCP server
 - **ML Backend**: Python subprocess for NLP, embeddings, and Agentic RAG
-- **MCP Integration**: Standardized tools for Claude Desktop, Cursor, and other AI clients
+- **MCP Integration**: Standardised tools for Claude Desktop, Cursor, and other AI clients
 
 ## Project Structure
 
@@ -124,7 +124,7 @@ zen-agentic-extension/
 
 1. **Human-in-the-Loop**: Destructive operations require explicit user confirmation
 2. **Isolated Profiles**: Use dedicated browser profiles for WebDriver automation
-3. **TCC Permissions**: Screen capture requires manual user authorization on macOS
+3. **TCC Permissions**: Screen capture requires manual user authorisation on macOS
 4. **Prompt Injection**: Validate all inputs from web pages before LLM processing
 
 ## License
